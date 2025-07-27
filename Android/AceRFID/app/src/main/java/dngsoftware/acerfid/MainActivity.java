@@ -35,7 +35,11 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
@@ -55,12 +59,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.gridlayout.widget.GridLayout;
 import androidx.room.Room;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 import java.nio.ByteBuffer;
@@ -82,6 +89,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     int SelectedSize;
     boolean userSelect = false;
     private ActivityMainBinding main;
+    Bitmap gradientBitmap;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -397,6 +406,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             PickerDialogBinding dl = PickerDialogBinding.inflate(getLayoutInflater());
             View rv = dl.getRoot();
             pickerDialog.setContentView(rv);
+            gradientBitmap = null;
 
             dl.btncls.setOnClickListener(v -> {
                 if (dl.txtcolor.getText().toString().length() == 8) {
@@ -417,6 +427,45 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
             setupPresetColors(dl);
             updateColorDisplay(dl, dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
+
+
+            setupGradientPicker(dl);
+
+            dl.gradientPickerView.setOnTouchListener((v, event) -> {
+                v.performClick();
+                if (gradientBitmap == null) {
+                    return false;
+                }
+                if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                    float touchX = event.getX();
+                    float touchY = event.getY();
+                    int pixelX = Math.max(0, Math.min(gradientBitmap.getWidth() - 1, (int) touchX));
+                    int pixelY = Math.max(0, Math.min(gradientBitmap.getHeight() - 1, (int) touchY));
+                    int pickedColor = gradientBitmap.getPixel(pixelX, pixelY);
+                    setSlidersFromColor(dl, Color.argb(255, Color.red(pickedColor), Color.green(pickedColor), Color.blue(pickedColor)));
+                    return true;
+                }
+                return false;
+            });
+
+            setupCollapsibleSection(dl,
+                    dl.rgbSlidersHeader,
+                    dl.rgbSlidersContent,
+                    dl.rgbSlidersToggleIcon,
+                    GetSetting(this,"RGB_VIEW",false)
+            );
+            setupCollapsibleSection(dl,
+                    dl.gradientPickerHeader,
+                    dl.gradientPickerContent,
+                    dl.gradientPickerToggleIcon,
+                    GetSetting(this,"PICKER_VIEW",true)
+            );
+            setupCollapsibleSection(dl,
+                    dl.presetColorsHeader,
+                    dl.presetColorsContent,
+                    dl.presetColorsToggleIcon,
+                    GetSetting(this,"PRESET_VIEW",true)
+            );
 
             SeekBar.OnSeekBarChangeListener rgbChangeListener = new SeekBar.OnSeekBarChangeListener() {
                 @Override
@@ -452,8 +501,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             dl.txtcolor.setOnClickListener(v -> showHexInputDialog(dl));
 
             pickerDialog.show();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     void openAddDialog(boolean edit) {
@@ -755,4 +803,84 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         Matcher matcher = pattern.matcher(hexCode);
         return matcher.matches();
     }
+
+
+    void setupGradientPicker(PickerDialogBinding dl) {
+        dl.gradientPickerView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                dl.gradientPickerView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                int width = dl.gradientPickerView.getWidth();
+                int height = dl.gradientPickerView.getHeight();
+                if (width > 0 && height > 0) {
+                    gradientBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(gradientBitmap);
+                    Paint paint = new Paint();
+                    float[] hsv = new float[3];
+                    hsv[1] = 1.0f;
+                    for (int y = 0; y < height; y++) {
+                        hsv[2] = 1.0f - (float) y / height;
+                        for (int x = 0; x < width; x++) {
+                            hsv[0] = (float) x / width * 360f;
+                            paint.setColor(Color.HSVToColor(255, hsv));
+                            canvas.drawPoint(x, y, paint);
+                        }
+                    }
+                    dl.gradientPickerView.setBackground(new BitmapDrawable(getResources(), gradientBitmap));
+                }
+            }
+        });
+    }
+
+    private void setupCollapsibleSection(PickerDialogBinding dl, LinearLayout header, final LinearLayout content, final ImageView toggleIcon, boolean isExpandedInitially) {
+        content.setVisibility(isExpandedInitially ? View.VISIBLE : View.GONE);
+        toggleIcon.setImageResource(isExpandedInitially ? R.drawable.ic_arrow_up : R.drawable.ic_arrow_down);
+        header.setOnClickListener(v -> {
+            if (content.getVisibility() == View.VISIBLE) {
+                content.setVisibility(View.GONE);
+                toggleIcon.setImageResource(R.drawable.ic_arrow_down);
+                if (header.getId() == dl.rgbSlidersHeader.getId()) {
+                    SaveSetting(this,"RGB_VIEW",false);
+                }
+                else if (header.getId() == dl.gradientPickerHeader.getId()) {
+                    SaveSetting(this,"PICKER_VIEW",false);
+                }
+                else if (header.getId() == dl.presetColorsHeader.getId()) {
+                    SaveSetting(this,"PRESET_VIEW",false);
+                }
+            } else {
+                content.setVisibility(View.VISIBLE);
+                toggleIcon.setImageResource(R.drawable.ic_arrow_up);
+                if (header.getId() == dl.rgbSlidersHeader.getId()) {
+                    SaveSetting(this,"RGB_VIEW",true);
+                }
+                else if (header.getId() == dl.gradientPickerHeader.getId()) {
+                    SaveSetting(this,"PICKER_VIEW",true);
+                    if (gradientBitmap == null) {
+                        setupGradientPicker(dl);
+                    }
+                }
+                else if (header.getId() == dl.presetColorsHeader.getId()) {
+                    SaveSetting(this,"PRESET_VIEW",true);
+                }
+            }
+        });
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
