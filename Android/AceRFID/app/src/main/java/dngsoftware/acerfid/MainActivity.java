@@ -1,6 +1,6 @@
 package dngsoftware.acerfid;
 
-import static java.lang.String.format;
+import static android.view.View.TEXT_ALIGNMENT_CENTER;
 import dngsoftware.acerfid.databinding.ActivityMainBinding;
 import dngsoftware.acerfid.databinding.AddDialogBinding;
 import dngsoftware.acerfid.databinding.PickerDialogBinding;
@@ -13,11 +13,9 @@ import static dngsoftware.acerfid.Utils.GetTemps;
 import static dngsoftware.acerfid.Utils.SetPermissions;
 import static dngsoftware.acerfid.Utils.arrayContains;
 import static dngsoftware.acerfid.Utils.bytesToHex;
-import static dngsoftware.acerfid.Utils.dp2Px;
 import static dngsoftware.acerfid.Utils.filamentTypes;
 import static dngsoftware.acerfid.Utils.filamentVendors;
 import static dngsoftware.acerfid.Utils.getAllMaterials;
-import static dngsoftware.acerfid.Utils.getPixelColor;
 import static dngsoftware.acerfid.Utils.materialWeights;
 import static dngsoftware.acerfid.Utils.numToBytes;
 import static dngsoftware.acerfid.Utils.GetSetting;
@@ -27,36 +25,42 @@ import static dngsoftware.acerfid.Utils.parseColor;
 import static dngsoftware.acerfid.Utils.parseNumber;
 import static dngsoftware.acerfid.Utils.playBeep;
 import static dngsoftware.acerfid.Utils.populateDatabase;
+import static dngsoftware.acerfid.Utils.presetColors;
+import static dngsoftware.acerfid.Utils.rotateArray;
 import static dngsoftware.acerfid.Utils.setTypeByItem;
 import static dngsoftware.acerfid.Utils.setVendorByItem;
 import static dngsoftware.acerfid.Utils.subArray;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
-import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
-import android.graphics.Shader;
-import android.graphics.drawable.ShapeDrawable;
-import android.graphics.drawable.shapes.RectShape;
+import android.graphics.drawable.GradientDrawable;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcA;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.text.Spanned;
 import android.util.DisplayMetrics;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.gridlayout.widget.GridLayout;
 import androidx.room.Room;
 import android.view.Window;
-import android.view.inputmethod.InputMethodManager;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Toast;
 import java.nio.ByteBuffer;
@@ -64,14 +68,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
     private MatDB matDb;
     private NfcAdapter nfcAdapter;
     Tag currentTag = null;
     ArrayAdapter<String> madapter, sadapter;
-    String MaterialName, MaterialWeight = "1 KG", MaterialColor = "0000FF";
+    String MaterialName, MaterialWeight = "1 KG", MaterialColor = "FF0000FF";
     Dialog pickerDialog, addDialog;
+    AlertDialog inputDialog;
     int SelectedSize;
     boolean userSelect = false;
     private ActivityMainBinding main;
@@ -198,6 +205,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             pickerDialog.dismiss();
             openPicker();
         }
+        if (inputDialog != null && inputDialog.isShowing()) {
+            inputDialog.dismiss();
+        }
     }
 
     @Override
@@ -286,7 +296,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     userSelect = true;
                     MaterialName = new String(subArray(buff.array(), 44, 16), StandardCharsets.UTF_8).trim();
                     main.material.setSelection(madapter.getPosition(MaterialName));
-                    MaterialColor = parseColor(subArray(buff.array(), 65, 3));
+                    MaterialColor = parseColor(rotateArray(subArray(buff.array(), 64, 4)));
                     main.colorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
                     // String sku = new String(subArray(buff.array(), 4, 16), StandardCharsets.UTF_8 ).trim();
                     // String Brand = new String(subArray(buff.array(), 24, 16), StandardCharsets.UTF_8).trim();
@@ -347,7 +357,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 nfcAWritePage(nfcA, 16, subArray(matData, 4, 4));   //type
                 nfcAWritePage(nfcA, 17, subArray(matData, 8, 4));   //type
                 nfcAWritePage(nfcA, 18, subArray(matData, 12, 4));  //type
-                nfcAWritePage(nfcA, 20, parseColor(MaterialColor + "FF")); //color
+                nfcAWritePage(nfcA, 20, parseColor(MaterialColor)); //color
                 //ultralight.writePage(23, new byte[] {50, 0, 100, 0});   //more temps?
                 byte[] extTemp = new byte[4];
                 System.arraycopy(numToBytes(GetTemps(matDb, MaterialName)[0]), 0, extTemp, 0, 2); //min
@@ -388,101 +398,59 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             View rv = dl.getRoot();
             pickerDialog.setContentView(rv);
 
-            dl.dcolorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
-            dl.txtcolor.setText(MaterialColor);
             dl.btncls.setOnClickListener(v -> {
-                if (dl.txtcolor.getText().toString().length() == 6) {
+                if (dl.txtcolor.getText().toString().length() == 8) {
                     try {
                         MaterialColor = dl.txtcolor.getText().toString();
-                        main.colorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
-                        dl.dcolorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
+                        int color = Color.argb(dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
+                        main.colorview.setBackgroundColor(color);
                     } catch (Exception ignored) {
                     }
                 }
                 pickerDialog.dismiss();
             });
-            dl.txtcolor.setOnEditorActionListener((v, actionId, event) -> {
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(dl.txtcolor.getWindowToken(), 0);
-                if (dl.txtcolor.getText().toString().length() == 6) {
-                    try {
-                        MaterialColor = dl.txtcolor.getText().toString();
-                        main.colorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
-                        dl.dcolorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
 
-                    } catch (Exception ignored) {
-                    }
-                }
-                return true;
-            });
-            dl.picker.setOnTouchListener((v, event) -> {
-                final int currPixel = getPixelColor(event, dl.picker);
-                if (currPixel != 0) {
-                    MaterialColor = format("%02x%02x%02x", Color.red(currPixel), Color.green(currPixel), Color.blue(currPixel)).toUpperCase();
-                    main.colorview.setBackgroundColor(Color.argb(255, Color.red(currPixel), Color.green(currPixel), Color.blue(currPixel)));
-                    dl.dcolorview.setBackgroundColor(Color.argb(255, Color.red(currPixel), Color.green(currPixel), Color.blue(currPixel)));
-                    pickerDialog.dismiss();
-                }
-                return false;
-            });
-            DisplayMetrics displayMetrics = new DisplayMetrics();
-            getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-            float scrWwidth = displayMetrics.widthPixels;
-            if (scrWwidth > dp2Px(this, 500)) scrWwidth = dp2Px(this, 500);
+            dl.redSlider.setProgress(Color.red(Color.parseColor("#" + MaterialColor)));
+            dl.greenSlider.setProgress(Color.green(Color.parseColor("#" + MaterialColor)));
+            dl.blueSlider.setProgress(Color.blue(Color.parseColor("#" + MaterialColor)));
+            dl.alphaSlider.setProgress(Color.alpha(Color.parseColor("#" + MaterialColor)));
 
-            LinearGradient test = new LinearGradient(50.f, 0.f, scrWwidth - 250, 0.0f,
-                    new int[]{0xFF000000, 0xFF0000FF, 0xFF00FF00, 0xFF00FFFF, 0xFFFF0000, 0xFFFF00FF, 0xFFFFFF00, 0xFFFFFFFF}, null, Shader.TileMode.CLAMP);
-            ShapeDrawable shape = new ShapeDrawable(new RectShape());
-            shape.getPaint().setShader(test);
-            dl.seekbarFont.setProgressDrawable(shape);
-            dl.seekbarFont.setMax(256 * 7 - 1);
-            dl.seekbarFont.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            setupPresetColors(dl);
+            updateColorDisplay(dl, dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
+
+            SeekBar.OnSeekBarChangeListener rgbChangeListener = new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    if (fromUser) {
-                        int r = 0;
-                        int g = 0;
-                        int b = 0;
-
-                        if (progress < 256) {
-                            b = progress;
-                        } else if (progress < 256 * 2) {
-                            g = progress % 256;
-                            b = 256 - progress % 256;
-                        } else if (progress < 256 * 3) {
-                            g = 255;
-                            b = progress % 256;
-                        } else if (progress < 256 * 4) {
-                            r = progress % 256;
-                            g = 256 - progress % 256;
-                            b = 256 - progress % 256;
-                        } else if (progress < 256 * 5) {
-                            r = 255;
-                            b = progress % 256;
-                        } else if (progress < 256 * 6) {
-                            r = 255;
-                            g = progress % 256;
-                            b = 256 - progress % 256;
-                        } else if (progress < 256 * 7) {
-                            r = 255;
-                            g = 255;
-                            b = progress % 256;
-                        }
-                        MaterialColor = format("%02x%02x%02x", r, g, b).toUpperCase();
-                        dl.txtcolor.setText(MaterialColor);
-                        main.colorview.setBackgroundColor(Color.argb(255, r, g, b));
-                        dl.dcolorview.setBackgroundColor(Color.argb(255, r, g, b));
-                    }
+                    updateColorDisplay(dl, dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
                 }
 
                 @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {}
+            };
+
+            dl.redSlider.setOnSeekBarChangeListener(rgbChangeListener);
+            dl.greenSlider.setOnSeekBarChangeListener(rgbChangeListener);
+            dl.blueSlider.setOnSeekBarChangeListener(rgbChangeListener);
+
+            dl.alphaSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+
+                    updateColorDisplay(dl, dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
                 }
 
                 @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {
-                }
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {}
             });
+
+            dl.txtcolor.setOnClickListener(v -> showHexInputDialog(dl));
+
             pickerDialog.show();
         } catch (Exception ignored) {
         }
@@ -663,4 +631,128 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         loadMaterials(true);
     }
 
+    private void updateColorDisplay(PickerDialogBinding dl, int currentAlpha,int currentRed,int currentGreen,int currentBlue) {
+        int color = Color.argb(currentAlpha, currentRed, currentGreen, currentBlue);
+        dl.colorDisplay.setBackgroundColor(color);
+        String hexCode = rgbToHexA(currentRed, currentGreen, currentBlue, currentAlpha);
+        dl.txtcolor.setText(hexCode);
+        double alphaNormalized = currentAlpha / 255.0;
+        int blendedRed = (int) (currentRed * alphaNormalized + 244 * (1 - alphaNormalized));
+        int blendedGreen = (int) (currentGreen * alphaNormalized + 244 * (1 - alphaNormalized));
+        int blendedBlue = (int) (currentBlue * alphaNormalized + 244 * (1 - alphaNormalized));
+        double brightness = (0.299 * blendedRed + 0.587 * blendedGreen + 0.114 * blendedBlue) / 255;
+        if (brightness > 0.5) {
+            dl.txtcolor.setTextColor(Color.BLACK);
+        } else {
+            dl.txtcolor.setTextColor(Color.WHITE);
+        }
+
+    }
+
+    private String rgbToHexA(int r, int g, int b, int a) {
+        return String.format("%02X%02X%02X%02X", a, r, g, b);
+    }
+
+    private void setupPresetColors(PickerDialogBinding dl) {
+        for (int color : presetColors()) {
+            Button colorButton = new Button(this);
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.width = (int) getResources().getDimension(R.dimen.preset_circle_size);
+            params.height = (int) getResources().getDimension(R.dimen.preset_circle_size);
+            params.setMargins(
+                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
+                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
+                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
+                    (int) getResources().getDimension(R.dimen.preset_circle_margin)
+            );
+            colorButton.setLayoutParams(params);
+            GradientDrawable circleDrawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(),R.drawable.circle_shape,null);
+            assert circleDrawable != null;
+            circleDrawable.setColor(color);
+            colorButton.setBackground(circleDrawable);
+            colorButton.setTag(color);
+
+            colorButton.setOnClickListener(v -> {
+                int selectedColor = (int) v.getTag();
+                setSlidersFromColor(dl, selectedColor);
+            });
+            dl.presetColorGrid.addView(colorButton);
+        }
+    }
+
+    private void setSlidersFromColor(PickerDialogBinding dl, int argbColor) {
+        dl.redSlider.setProgress(Color.red(argbColor));
+        dl.greenSlider.setProgress(Color.green(argbColor));
+        dl.blueSlider.setProgress(Color.blue(argbColor));
+        dl.alphaSlider.setProgress(Color.alpha(argbColor));
+        updateColorDisplay(dl, Color.alpha(argbColor), Color.red(argbColor), Color.green(argbColor), Color.blue(argbColor));
+    }
+
+    private void showHexInputDialog(PickerDialogBinding dl) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+        builder.setTitle(R.string.enter_hex_color_aarrggbb);
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        input.setHint(R.string.aarrggbb);
+        input.setTextColor(Color.BLACK);
+        input.setHintTextColor(Color.GRAY);
+        input.setTextAlignment(TEXT_ALIGNMENT_CENTER);
+        input.setText(rgbToHexA(dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress(), dl.alphaSlider.getProgress()));
+        InputFilter[] filters = new InputFilter[3];
+        filters[0] = new HexInputFilter();
+        filters[1] = new InputFilter.LengthFilter(8);
+        filters[2] = new InputFilter.AllCaps();
+        input.setFilters(filters);
+        builder.setView(input);
+        builder.setCancelable(true);
+        builder.setPositiveButton(R.string.submit, (dialog, which) -> {
+            String hexInput = input.getText().toString().trim();
+            if (isValidHexCode(hexInput)) {
+                setSlidersFromColor(dl, Color.parseColor("#" + hexInput));
+            } else {
+                Toast.makeText(MainActivity.this, R.string.invalid_hex_code_please_use_aarrggbb_format, Toast.LENGTH_LONG).show();
+            }
+        });
+        builder.setNegativeButton(R.string.cancel, (dialog, which) -> dialog.cancel());
+        inputDialog = builder.create();
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int screenWidthPx = displayMetrics.widthPixels;
+        float density = getResources().getDisplayMetrics().density;
+        int maxWidthDp = 100;
+        int maxWidthPx = (int) (maxWidthDp * density);
+        int dialogWidthPx = (int) (screenWidthPx * 0.80);
+        if (dialogWidthPx > maxWidthPx) {
+            dialogWidthPx = maxWidthPx;
+        }
+        Objects.requireNonNull(inputDialog.getWindow()).setLayout(dialogWidthPx, WindowManager.LayoutParams.WRAP_CONTENT);
+        inputDialog.getWindow().setGravity(Gravity.CENTER); // Center the dialog on the screen
+        inputDialog.setOnShowListener(dialogInterface -> {
+            Button positiveButton = inputDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            Button negativeButton = inputDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            positiveButton.setTextColor(Color.parseColor("#82B1FF"));
+            negativeButton.setTextColor(Color.parseColor("#82B1FF"));
+        });
+        inputDialog.show();
+    }
+
+    private static class HexInputFilter implements InputFilter {
+        @Override
+        public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+            StringBuilder filtered = new StringBuilder();
+            for (int i = start; i < end; i++) {
+                char character = source.charAt(i);
+                if (Character.isDigit(character) || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')) {
+                    filtered.append(character);
+                }
+            }
+            return filtered.toString();
+        }
+    }
+
+    private boolean isValidHexCode(String hexCode) {
+        Pattern pattern = Pattern.compile("^[0-9a-fA-F]{8}$");
+        Matcher matcher = pattern.matcher(hexCode);
+        return matcher.matches();
+    }
 }

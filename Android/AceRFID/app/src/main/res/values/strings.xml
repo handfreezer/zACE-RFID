@@ -48,4 +48,12 @@
     <string name="notice">Notice</string>
     <string name="cf_notice">Custom filament settings do not currently work with remote print or cloud print functions.</string>
     <string name="accept">Accept</string>
+    <string name="red">Red</string>
+    <string name="green">Green</string>
+    <string name="blue">Blue</string>
+    <string name="alpha">Alpha</string>
+    <string name="submit">Submit</string>
+    <string name="invalid_hex_code_please_use_aarrggbb_format">Invalid Hex Code. Please use AARRGGBB format.</string>
+    <string name="enter_hex_color_aarrggbb">Enter Hex Color (AARRGGBB)</string>
+    <string name="aarrggbb">AARRGGBB</string>
 </resources>
