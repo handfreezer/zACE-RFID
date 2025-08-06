@@ -33,12 +33,18 @@ namespace ACE_RFID
                 byte[] uid = reader.GetData();
                 Invoke((MethodInvoker)delegate ()
                 {
+                    if (uid == null)
+                    {
+                        Toast.Show(this, "Tag not compatible", Toast.LENGTH_LONG, true);
+                        icReader.Dispose();
+                        reader = null;
+                        return;
+                    }
                     if (string.IsNullOrEmpty(FwVersion))
                     {
                         FwVersion = ReaderVersion(reader);
                         Text = string.IsNullOrEmpty(FwVersion) ? "CFS RFID" : FwVersion;
                     }
-
                     lblUid.Text = BitConverter.ToString(uid).Replace("-", " ");
                     lblTagId.Visible = true;
                     balloonTip.SetToolTip(lblUid, "UID: " + lblUid.Text);
@@ -180,6 +186,7 @@ namespace ACE_RFID
                     Encoding.UTF8.GetBytes(materialType.Text).CopyTo(buffer, 44); //type
 
                     buffer[64] = (byte)0xFF;
+                    if (materialColor.Equals("000000")) { materialColor = "010101"; } // basic fix for anycubic setting black to transparent
                     ParseColor(materialColor).CopyTo(buffer, 65); //color
 
                     NumToBytes(GetTemps(materialType.Text)[0]).CopyTo(buffer, 80); //ext min
@@ -218,9 +225,8 @@ namespace ACE_RFID
                     // String Brand = Encoding.UTF8.GetString(SubArray(buffer, 24, 20)).Trim();
 
                     materialType.Text = Encoding.UTF8.GetString(SubArray(buffer, 44, 20)).Trim();
-
                     materialColor = ParseColor(SubArray(buffer, 65, 3));
-
+                    if (materialColor.Equals("010101")) { materialColor = "000000"; } // basic fix for anycubic setting black to transparent
                     btnColor.BackColor = ColorTranslator.FromHtml("#" + materialColor);
 
                     int extMin = ParseNumber(SubArray(buffer, 80, 2));

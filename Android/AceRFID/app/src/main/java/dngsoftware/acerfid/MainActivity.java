@@ -13,9 +13,11 @@ import static dngsoftware.acerfid.Utils.GetTemps;
 import static dngsoftware.acerfid.Utils.SetPermissions;
 import static dngsoftware.acerfid.Utils.arrayContains;
 import static dngsoftware.acerfid.Utils.bytesToHex;
+import static dngsoftware.acerfid.Utils.combineArrays;
 import static dngsoftware.acerfid.Utils.filamentTypes;
 import static dngsoftware.acerfid.Utils.filamentVendors;
 import static dngsoftware.acerfid.Utils.getAllMaterials;
+import static dngsoftware.acerfid.Utils.hexToByte;
 import static dngsoftware.acerfid.Utils.materialWeights;
 import static dngsoftware.acerfid.Utils.numToBytes;
 import static dngsoftware.acerfid.Utils.GetSetting;
@@ -26,7 +28,6 @@ import static dngsoftware.acerfid.Utils.parseNumber;
 import static dngsoftware.acerfid.Utils.playBeep;
 import static dngsoftware.acerfid.Utils.populateDatabase;
 import static dngsoftware.acerfid.Utils.presetColors;
-import static dngsoftware.acerfid.Utils.rotateArray;
 import static dngsoftware.acerfid.Utils.setTypeByItem;
 import static dngsoftware.acerfid.Utils.setVendorByItem;
 import static dngsoftware.acerfid.Utils.subArray;
@@ -50,6 +51,7 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.text.Spanned;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -57,7 +59,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.res.ResourcesCompat;
-import androidx.gridlayout.widget.GridLayout;
 import androidx.room.Room;
 import android.view.ViewTreeObserver;
 import android.view.Window;
@@ -70,6 +71,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
+import com.google.android.flexbox.FlexboxLayout;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -205,6 +207,12 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             } catch (Exception ignored) {
             }
         }
+        if (pickerDialog != null && pickerDialog.isShowing()) {
+            pickerDialog.dismiss();
+        }
+        if (inputDialog != null && inputDialog.isShowing()) {
+            inputDialog.dismiss();
+        }
     }
 
     @Override
@@ -305,7 +313,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     userSelect = true;
                     MaterialName = new String(subArray(buff.array(), 44, 16), StandardCharsets.UTF_8).trim();
                     main.material.setSelection(madapter.getPosition(MaterialName));
-                    MaterialColor = parseColor(rotateArray(subArray(buff.array(), 64, 4)));
+                    String color = parseColor(subArray(buff.array(), 65, 3));
+                    String alpha = bytesToHex(subArray(buff.array(), 64, 1),false);
+                    if (color.equals("010101")) {color = "000000";} // basic fix for anycubic setting black to transparent)
+                    MaterialColor =  alpha + color;
                     main.colorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
                     // String sku = new String(subArray(buff.array(), 4, 16), StandardCharsets.UTF_8 ).trim();
                     // String Brand = new String(subArray(buff.array(), 24, 16), StandardCharsets.UTF_8).trim();
@@ -366,7 +377,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 nfcAWritePage(nfcA, 16, subArray(matData, 4, 4));   //type
                 nfcAWritePage(nfcA, 17, subArray(matData, 8, 4));   //type
                 nfcAWritePage(nfcA, 18, subArray(matData, 12, 4));  //type
-                nfcAWritePage(nfcA, 20, parseColor(MaterialColor)); //color
+                String color = MaterialColor.substring(2);
+                String alpha = MaterialColor.substring(0, 2);
+                if (color.equals("000000")) {color = "010101";}// basic fix for anycubic setting black to transparent
+                nfcAWritePage(nfcA, 20, combineArrays(hexToByte(alpha),parseColor(color))); //color
                 //ultralight.writePage(23, new byte[] {50, 0, 100, 0});   //more temps?
                 byte[] extTemp = new byte[4];
                 System.arraycopy(numToBytes(GetTemps(matDb, MaterialName)[0]), 0, extTemp, 0, 2); //min
@@ -383,8 +397,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 nfcAWritePage(nfcA, 31, new byte[]{(byte) 232, 3, 0, 0}); //?
                 playBeep();
                 Toast.makeText(getApplicationContext(), R.string.data_written_to_tag, Toast.LENGTH_SHORT).show();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 Toast.makeText(getApplicationContext(), R.string.error_writing_to_tag, Toast.LENGTH_SHORT).show();
+
+                Log.e("Error", Log.getStackTraceString(e));
+
             } finally {
                 try {
                     nfcA.close();
@@ -702,11 +719,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
     private void setupPresetColors(PickerDialogBinding dl) {
+        dl.presetColorGrid.removeAllViews();
         for (int color : presetColors()) {
             Button colorButton = new Button(this);
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-            params.width = (int) getResources().getDimension(R.dimen.preset_circle_size);
-            params.height = (int) getResources().getDimension(R.dimen.preset_circle_size);
+            FlexboxLayout.LayoutParams params = new FlexboxLayout.LayoutParams(
+                    (int) getResources().getDimension(R.dimen.preset_circle_size),
+                    (int) getResources().getDimension(R.dimen.preset_circle_size)
+            );
             params.setMargins(
                     (int) getResources().getDimension(R.dimen.preset_circle_margin),
                     (int) getResources().getDimension(R.dimen.preset_circle_margin),
@@ -714,12 +733,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     (int) getResources().getDimension(R.dimen.preset_circle_margin)
             );
             colorButton.setLayoutParams(params);
-            GradientDrawable circleDrawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(),R.drawable.circle_shape,null);
+            GradientDrawable circleDrawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.circle_shape, null);
             assert circleDrawable != null;
             circleDrawable.setColor(color);
             colorButton.setBackground(circleDrawable);
             colorButton.setTag(color);
-
             colorButton.setOnClickListener(v -> {
                 int selectedColor = (int) v.getTag();
                 setSlidersFromColor(dl, selectedColor);

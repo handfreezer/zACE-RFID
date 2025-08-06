@@ -7,23 +7,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.FeatureInfo;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.drawable.BitmapDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
-import android.util.DisplayMetrics;
-import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.widget.ArrayAdapter;
-import android.widget.ImageView;
 import android.widget.Spinner;
 import androidx.core.content.ContextCompat;
-import androidx.gridlayout.widget.GridLayout;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -232,19 +223,6 @@ public class Utils {
         return sb.toString();
     }
 
-    public static int getPixelColor(MotionEvent event, ImageView picker) {
-        int viewX = (int) event.getX();
-        int viewY = (int) event.getY();
-        int viewWidth = picker.getWidth();
-        int viewHeight = picker.getHeight();
-        Bitmap image = ((BitmapDrawable) picker.getDrawable()).getBitmap();
-        int imageWidth = image.getWidth();
-        int imageHeight = image.getHeight();
-        int imageX = (int) ((float) viewX * ((float) imageWidth / (float) viewWidth));
-        int imageY = (int) ((float) viewY * ((float) imageHeight / (float) viewHeight));
-        return image.getPixel(imageX, imageY);
-    }
-
     public static void SetPermissions(Context context) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.NFC) != PackageManager.PERMISSION_GRANTED) {
             String[] perms = {Manifest.permission.NFC};
@@ -331,16 +309,23 @@ public class Utils {
                 return new byte[]{(byte) 0xFF, (byte) 0x00, (byte) 0x00, (byte) 0xFF};
             }
         }
-        return revArray(rotateArray(byteArray));
+        return revArray(byteArray);
     }
 
-    public static byte[] rotateArray(byte[] b) {
-        byte f = b[0];
-        for (int i = 0; i < b.length - 1; i++) {
-            b[i] = b[i + 1];
+    public static byte[] combineArrays(byte[] array1, byte[] array2) {
+        byte[] combined = new byte[array1.length + array2.length];
+        System.arraycopy(array1, 0, combined, 0, array1.length);
+        System.arraycopy(array2, 0, combined, array1.length, array2.length);
+        return combined;
+    }
+
+    public static byte[] hexToByte(String hexString) {
+        byte[] byteArray = new byte[hexString.length() / 2];
+        for (int i = 0; i < hexString.length(); i += 2) {
+            String subString = hexString.substring(i, i + 2);
+            byteArray[i / 2] = (byte) Integer.parseInt(subString, 16);
         }
-        b[b.length - 1] = f;
-        return b;
+        return byteArray;
     }
 
     public static String parseColor(byte[] byteArray) {
@@ -361,11 +346,6 @@ public class Utils {
             Intent intent = new Intent(Intent.ACTION_VIEW, webpage);
             context.startActivity(intent);
         } catch (Exception ignored) {}
-    }
-
-    public static float dp2Px(Context context, float dipValue) {
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dipValue, metrics);
     }
 
     public static String GetSetting(Context context, String sKey, String sDefault) {

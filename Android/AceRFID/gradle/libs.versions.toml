@@ -1,31 +1,17 @@
 [versions]
 activityVersion = "1.0.8"
-agp = "8.11.1"
+agp = "8.12.0"
 appcompatVersion = "1.6.1"
 constraintlayoutVersion = "2.1.4"
-gridlayout = "1.0.0"
-junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-appcompat = "1.7.0"
+flexbox = "3.0.0"
 material = "1.12.0"
-activity = "1.10.0"
-constraintlayout = "2.2.0"
-roomRuntime = "2.7.0-rc02"
-roomCompiler = "2.7.0-rc02"
 
 [libraries]
 activity-v108 = { module = "androidx.activity:activity", version.ref = "activityVersion" }
 appcompat-v161 = { module = "androidx.appcompat:appcompat", version.ref = "appcompatVersion" }
 constraintlayout-v214 = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayoutVersion" }
-gridlayout = { module = "androidx.gridlayout:gridlayout", version.ref = "gridlayout" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+flexbox = { module = "com.google.android.flexbox:flexbox", version.ref = "flexbox" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version = "2.6.1" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version = "2.6.1" }
 

@@ -18,7 +18,10 @@ namespace ACE_RFID
         public byte[] GetData()
         {
             byte[] response = new byte[10];
-            reader.Transmit(new byte[] { 0xFF, 0xCA, 0x00, 0x00, 0x00 }, response);
+            if (reader.Transmit(new byte[] { 0xFF, 0xCA, 0x00, 0x00, 0x00 }, response) < 8)
+            {
+                return null;
+            }
             Array.Resize(ref response, 6);
             return response;
         }

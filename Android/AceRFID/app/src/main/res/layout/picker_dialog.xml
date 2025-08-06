@@ -260,16 +260,15 @@
                     android:layout_height="match_parent"
                     android:scrollbars="vertical">
 
-                    <androidx.gridlayout.widget.GridLayout
+                    <com.google.android.flexbox.FlexboxLayout
                         android:id="@+id/presetColorGrid"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        app:alignmentMode="alignBounds"
-                        app:columnCount="5"
-                        app:columnOrderPreserved="false"
-                        app:rowCount="6"
-                        app:useDefaultMargins="false" />
+                        app:flexWrap="wrap"
+                        app:alignItems="center"
+                        app:justifyContent="center">
+
+                    </com.google.android.flexbox.FlexboxLayout>
 
                 </androidx.core.widget.NestedScrollView>
 
@@ -301,6 +300,7 @@
                     android:id="@+id/colorDisplayFrame"
                     android:layout_width="180dp"
                     android:layout_height="60dp"
+                    android:layout_weight="10"
                     android:layout_gravity="start"
                     android:layout_marginStart="10dp">
 
