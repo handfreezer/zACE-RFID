@@ -59,4 +59,7 @@
     <string name="rgb_sliders">ARGB Sliders</string>
     <string name="color_picker">Color Picker</string>
     <string name="preset_colors">Preset Colors</string>
+    <string name="formatting_tag">Formatting tag…</string>
+    <string name="tag_formatted">Tag formatted</string>
+    <string name="failed_to_format_tag_for_writing">Failed to format tag for writing</string>
 </resources>

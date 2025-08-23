@@ -51,7 +51,6 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.text.Spanned;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -318,6 +317,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     if (color.equals("010101")) {color = "000000";} // basic fix for anycubic setting black to transparent)
                     MaterialColor =  alpha + color;
                     main.colorview.setBackgroundColor(Color.parseColor("#" + MaterialColor));
+
+
+
                     // String sku = new String(subArray(buff.array(), 4, 16), StandardCharsets.UTF_8 ).trim();
                     // String Brand = new String(subArray(buff.array(), 24, 16), StandardCharsets.UTF_8).trim();
                     int extMin = parseNumber(subArray(buff.array(), 80, 2));
@@ -363,6 +365,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         if (nfcA != null) {
             try {
                 nfcA.connect();
+                try {
+                    nfcAWritePage(nfcA, 4, new byte[] {0, 0, 0, 0});
+                } catch (Exception ignored) {
+                    nfcA.close();
+                    formatTag(tag);
+                }
+                if (!nfcA.isConnected()) {
+                    nfcA.connect();
+                }
                 nfcAWritePage(nfcA, 4, new byte[]{123, 0, 101, 0});
                 for (int i = 0; i < 5; i++) { //sku
                     nfcAWritePage(nfcA, 5 + i, subArray(GetSku(matDb, MaterialName), i * 4, 4));
@@ -379,8 +390,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 nfcAWritePage(nfcA, 18, subArray(matData, 12, 4));  //type
                 String color = MaterialColor.substring(2);
                 String alpha = MaterialColor.substring(0, 2);
-                if (color.equals("000000")) {color = "010101";}// basic fix for anycubic setting black to transparent
-                nfcAWritePage(nfcA, 20, combineArrays(hexToByte(alpha),parseColor(color))); //color
+                if (color.equals("000000")) {
+                    color = "010101";
+                }// basic fix for anycubic setting black to transparent
+                nfcAWritePage(nfcA, 20, combineArrays(hexToByte(alpha), parseColor(color))); //color
                 //ultralight.writePage(23, new byte[] {50, 0, 100, 0});   //more temps?
                 byte[] extTemp = new byte[4];
                 System.arraycopy(numToBytes(GetTemps(matDb, MaterialName)[0]), 0, extTemp, 0, 2); //min
@@ -399,17 +412,60 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 Toast.makeText(getApplicationContext(), R.string.data_written_to_tag, Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
                 Toast.makeText(getApplicationContext(), R.string.error_writing_to_tag, Toast.LENGTH_SHORT).show();
-
-                Log.e("Error", Log.getStackTraceString(e));
-
             } finally {
                 try {
                     nfcA.close();
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ignored) {}
             }
         } else {
             Toast.makeText(getApplicationContext(), R.string.invalid_tag_type, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean is215(NfcA nfcA) {
+        byte pageToRead = (byte) 50;
+        byte[] readCommand = new byte[] {(byte) 0x30, pageToRead};
+        try {
+            nfcA.connect();
+            byte[] result = nfcA.transceive(readCommand);
+            if (result != null && result.length == 4) {
+                return true;
+            }
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            try {
+                nfcA.close();
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    private void formatTag(Tag tag) {
+        if (tag == null) {
+            Toast.makeText(getApplicationContext(), R.string.no_nfc_tag_found, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        NfcA nfcA = NfcA.get(tag);
+        try {
+            boolean isNtag215 = is215(nfcA);
+            byte[] ccBytes;
+            if (isNtag215) {
+                ccBytes = new byte[] {(byte) 0xE1, (byte) 0x10, (byte) 0x6D, (byte) 0x00};
+            } else {
+                ccBytes = new byte[] {(byte) 0xE1, (byte) 0x10, (byte) 0x12, (byte) 0x00};
+            }
+            Toast.makeText(getApplicationContext(), R.string.formatting_tag, Toast.LENGTH_SHORT).show();
+            nfcA.connect();
+            nfcAWritePage(nfcA, 2, new byte[] {0x00, 0x00, 0x00, 0x00});
+            nfcAWritePage(nfcA, 3, ccBytes);
+            Toast.makeText(getApplicationContext(), R.string.tag_formatted, Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {
+            Toast.makeText(getApplicationContext(), R.string.failed_to_format_tag_for_writing, Toast.LENGTH_SHORT).show();
+        } finally {
+            try {
+                nfcA.close();
+            } catch (Exception ignored) {}
         }
     }
 

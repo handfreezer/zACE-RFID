@@ -90,7 +90,7 @@ Tag page structure<br>
 |  17  |  00 00 00 00  |          type
 |  18  |  00 00 00 00  |          type
 |      |               | 
-|  20  |  FF 00 FF 00  |  00FF00  bgr color
+|  20  |  FF 00 FF 00  |  FF00FF00  abgr color
 |      |               |
 |  24  |  C8 00 D2 00  |  extruder_temp [ min C8 00 / max  D2 00 ]
 |      |               |
