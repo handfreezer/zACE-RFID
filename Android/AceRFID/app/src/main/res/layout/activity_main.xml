@@ -144,31 +144,60 @@
         app:layout_constraintTop_toBottomOf="@+id/lblsize" />
 
     <TextView
-        android:id="@+id/tagid"
+        android:id="@+id/tagtype"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:singleLine="true"
         android:layout_marginTop="40dp"
-        android:text="@string/_00_00_00_00"
+        android:text=""
+        android:textColor="@color/text_color"
+        android:textSize="18sp"
+        app:layout_constraintStart_toEndOf="@+id/lbltagtype"
+        app:layout_constraintTop_toBottomOf="@+id/autoread" />
+
+    <TextView
+        android:id="@+id/lbltagtype"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:singleLine="true"
+        android:text="@string/type"
+        android:visibility="invisible"
+        android:textColor="@color/text_color"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@+id/tagtype"
+        app:layout_constraintStart_toStartOf="@+id/autoread"
+        app:layout_constraintTop_toBottomOf="@+id/autoread" />
+
+    <TextView
+        android:id="@+id/tagid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:singleLine="true"
+        android:layout_marginTop="2dp"
+        android:text=""
         android:textColor="@color/text_color"
         android:textSize="18sp"
         app:layout_constraintStart_toEndOf="@+id/lbltagid"
-        app:layout_constraintTop_toBottomOf="@+id/autoread" />
+        app:layout_constraintTop_toBottomOf="@+id/lbltagtype" />
 
     <TextView
         android:id="@+id/lbltagid"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="2dp"
         android:singleLine="true"
         android:text="@string/tag_id"
+        android:visibility="invisible"
         android:textColor="@color/text_color"
         android:textSize="18sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toStartOf="@+id/tagid"
         app:layout_constraintStart_toStartOf="@+id/autoread"
-        app:layout_constraintTop_toBottomOf="@+id/autoread" />
+        app:layout_constraintTop_toBottomOf="@+id/lbltagtype" />
 
     <Button
         android:id="@+id/readbutton"

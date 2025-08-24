@@ -229,12 +229,27 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     @Override
     public void onTagDiscovered(Tag tag) {
         try {
-            currentTag = tag;
             runOnUiThread(() -> {
-                Toast.makeText(getApplicationContext(), getString(R.string.tag_found) + bytesToHex(currentTag.getId(), false), Toast.LENGTH_SHORT).show();
-                main.tagid.setText(bytesToHex(currentTag.getId(), true));
-                if (GetSetting(this, "autoread", false)) {
-                    readTag(currentTag);
+                byte[] uid = tag.getId();
+                if (uid.length >= 6) {
+                    currentTag = tag;
+                    Toast.makeText(getApplicationContext(), getString(R.string.tag_found) + bytesToHex(uid, false), Toast.LENGTH_SHORT).show();
+                    int tagType = getNtagType(NfcA.get(currentTag));
+                    main.tagid.setText(bytesToHex(uid, true));
+                    main.tagtype.setText(String.format(Locale.getDefault(), "   NTAG%d", tagType));
+                    main.lbltagid.setVisibility(View.VISIBLE);
+                    main.lbltagtype.setVisibility(View.VISIBLE);
+                    if (GetSetting(this, "autoread", false)) {
+                        readTag(currentTag);
+                    }
+                }
+                else {
+                    currentTag = null;
+                    main.tagid.setText("");
+                    main.tagtype.setText("");
+                    main.lbltagid.setVisibility(View.INVISIBLE);
+                    main.lbltagtype.setVisibility(View.INVISIBLE);
+                    Toast.makeText(getApplicationContext(), R.string.invalid_tag_type, Toast.LENGTH_SHORT).show();
                 }
             });
         } catch (Exception ignored) {
@@ -280,10 +295,25 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()) || NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
                     currentTag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
                     assert currentTag != null;
-                    Toast.makeText(getApplicationContext(), getString(R.string.tag_found) + bytesToHex(currentTag.getId(), false), Toast.LENGTH_SHORT).show();
-                    main.tagid.setText(bytesToHex(currentTag.getId(), true));
-                    if (GetSetting(this, "autoread", false)) {
-                        readTag(currentTag);
+                    byte[] uid = currentTag.getId();
+                    if (uid.length >= 6) {
+                        int tagType = getNtagType(NfcA.get(currentTag));
+                        Toast.makeText(getApplicationContext(), getString(R.string.tag_found) + bytesToHex(uid, false), Toast.LENGTH_SHORT).show();
+                        main.tagid.setText(bytesToHex(uid, true));
+                        main.tagtype.setText(String.format(Locale.getDefault(), "   NTAG%d", tagType));
+                        main.lbltagid.setVisibility(View.VISIBLE);
+                        main.lbltagtype.setVisibility(View.VISIBLE);
+                        if (GetSetting(this, "autoread", false)) {
+                            readTag(currentTag);
+                        }
+                    }
+                    else {
+                        currentTag = null;
+                        main.tagid.setText("");
+                        main.tagtype.setText("");
+                        main.lbltagid.setVisibility(View.INVISIBLE);
+                        main.lbltagtype.setVisibility(View.INVISIBLE);
+                        Toast.makeText(getApplicationContext(), R.string.invalid_tag_type, Toast.LENGTH_SHORT).show();
                     }
                 }
             } catch (Exception ignored) {
@@ -366,7 +396,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             try {
                 nfcA.connect();
                 try {
-                    nfcAWritePage(nfcA, 4, new byte[] {0, 0, 0, 0});
+                    nfcAWritePage(nfcA, 4, new byte[]{123, 0, 101, 0});
                 } catch (Exception ignored) {
                     nfcA.close();
                     formatTag(tag);
@@ -374,7 +404,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 if (!nfcA.isConnected()) {
                     nfcA.connect();
                 }
-                nfcAWritePage(nfcA, 4, new byte[]{123, 0, 101, 0});
                 for (int i = 0; i < 5; i++) { //sku
                     nfcAWritePage(nfcA, 5 + i, subArray(GetSku(matDb, MaterialName), i * 4, 4));
                 }
@@ -422,17 +451,26 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
-    private boolean is215(NfcA nfcA) {
-        byte pageToRead = (byte) 50;
-        byte[] readCommand = new byte[] {(byte) 0x30, pageToRead};
+    private int getNtagType(NfcA nfcA) {
+        if (probePage(nfcA, (byte) 50)) {
+            if (probePage(nfcA, (byte) 150)) {
+                return 216;
+            } else {
+                return 215;
+            }
+        } else {
+            return 213;
+        }
+    }
+
+    private boolean probePage(NfcA nfcA, byte pageNumber) {
         try {
             nfcA.connect();
-            byte[] result = nfcA.transceive(readCommand);
-            if (result != null && result.length == 4) {
+            byte[] result = nfcA.transceive(new byte[] {(byte) 0x30, pageNumber});
+            if (result != null && result.length == 16) {
                 return true;
             }
         } catch (Exception ignored) {
-            return false;
         } finally {
             try {
                 nfcA.close();
@@ -448,10 +486,12 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
         NfcA nfcA = NfcA.get(tag);
         try {
-            boolean isNtag215 = is215(nfcA);
+            int tagType = getNtagType(nfcA);
             byte[] ccBytes;
-            if (isNtag215) {
+            if (tagType == 216) {
                 ccBytes = new byte[] {(byte) 0xE1, (byte) 0x10, (byte) 0x6D, (byte) 0x00};
+            } else if (tagType == 215) {
+                ccBytes = new byte[] {(byte) 0xE1, (byte) 0x10, (byte) 0x3E, (byte) 0x00};
             } else {
                 ccBytes = new byte[] {(byte) 0xE1, (byte) 0x10, (byte) 0x12, (byte) 0x00};
             }
