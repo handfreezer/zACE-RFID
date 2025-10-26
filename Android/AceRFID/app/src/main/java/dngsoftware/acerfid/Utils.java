@@ -534,6 +534,7 @@ public class Utils {
             "PC",
             "PETG",
             "PLA",
+            "PLA+",
             "PLA-CF",
             "PVA",
             "PP",
@@ -558,6 +559,8 @@ public class Utils {
                 return new int[]{230, 250, 70, 90};
             case "PLA":
                 return new int[]{190, 230, 50, 60};
+            case "PLA+":
+                return new int[]{190, 230, 55, 65};
             case "PLA-CF":
                 return new int[]{210, 240, 45, 65};
             case "PVA":
